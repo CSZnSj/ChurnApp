@@ -1,14 +1,13 @@
-import logging
+from src.logger import setup_logger
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import (
     StructType, StructField, StringType, LongType, DoubleType, DecimalType
 )
 from pyspark.sql.functions import to_date, to_timestamp
-from utils import create_spark_session, load_config
+from src.utils import create_spark_session, load_config
 
 # Initialize logger
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__, log_file='./output/logs/ingest.log')
 
 class CustomSchema:
     """Defines custom schemas for different datasets."""
@@ -159,11 +158,13 @@ def ingest_data(config: dict) -> None:
             spark.stop()
             logger.info("Spark session stopped")
 
-
-if __name__ == "__main__":
+def main():
     try:
         config = load_config("config.json")
         ingest_data(config)
         logger.info("Data ingestion process completed successfully.")
     except Exception as e:
         logger.error(f"Failed to complete data ingestion: {e}")
+
+if __name__ == "__main__":
+    main()
