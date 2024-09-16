@@ -1,0 +1,52 @@
+{
+    "months": ["38", "39", "40"],
+    "keys": ["loan_assign", "loan_recovery", "package", "recharge", "cdr", "user"],
+    "ingestion" : {
+        "paths": {
+            "csv": {
+                "loan_assign": "data/csv/loan_assign_{month}.csv",
+                "loan_recovery": "data/csv/loan_recovery_{month}.csv",
+                "package": "data/csv/package_{month}.csv",
+                "recharge": "data/csv/recharge_{month}.csv",
+                "cdr": "data/csv/cdr_{month}.csv",
+                "user": "data/csv/user_{month}.csv"
+            },
+            "parquet": {
+                "loan_assign": "data/parquet/loan_assign_{month}.parquet",
+                "loan_recovery": "data/parquet/loan_recovery_{month}.parquet",
+                "package": "data/parquet/package_{month}.parquet",
+                "recharge": "data/parquet/recharge_{month}.parquet",
+                "cdr": "data/parquet/cdr_{month}.parquet",
+                "user": "data/parquet/user_{month}.parquet"
+            }
+        },
+        "convert_date_columns" : {
+            "loan_assign": {
+                "timestamp_columns":["date_timestamp"],
+                "date_columns":["date_key"]
+            },
+            "loan_recovery": {
+                "timestamp_columns":["date_timestamp"],
+                "date_columns":["date_key"]
+            },
+            "package": {
+                "timestamp_columns":["activation_date", "deactivation_date"],
+                "date_columns": ["date_key"]
+            },
+            "recharge": {
+                "timestamp_columns":["recharge_dt"],
+                "date_columns": ["date_key"]
+            },
+            "cdr": {
+                "timestamp_columns":[],
+                "date_columns": ["date_key"]
+            },
+            "user": {
+                "timestamp_columns":[],
+                "date_columns": ["registration_date_d", "date_of_birth_d"]
+            }
+        }
+
+    }    
+}
+
