@@ -1,0 +1,92 @@
+# Virtual environment
+venv/
+Rose/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+# Airflow specific
+unittests.cfg
+webserver_config.py
+*.log
+*.pid
+*.sqlite
+logs/
+tmp/
+
+# PySpark specific
+metastore_db/
+derby.log
+
+# Distribution / packaging
+*.egg-info/
+*.eggs/
+*.whl
+*.wheel
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+*.pyo
+*.pyd
+
+# Test result files
+coverage.xml
+*.cover
+*.log
+*.out
+*.err
+.nox/
+.tox/
+
+# Jupyter Notebook temporary output
+*.nbconvert.ipynb
+
+# IPython history
+.history
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+logs/
+db.sqlite
+cb_cache/
+venv/
+airflow.db
+*.pyc
+__pycache__/
+secrets/
+
+# Airflow SQLite database journal
+airflow.db-journal
+
+# Airflow standalone mode password file
+standalone_admin_password.txt
+
+# Data folder
+data/
