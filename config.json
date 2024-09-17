@@ -15,76 +15,53 @@
     "ingestion": {
         "paths": {
             "csv": {
-                "loan_assign": "data/csv/loan_assign_{month}.csv",
-                "loan_recovery": "data/csv/loan_recovery_{month}.csv",
-                "package": "data/csv/package_{month}.csv",
-                "recharge": "data/csv/recharge_{month}.csv",
-                "cdr": "data/csv/cdr_{month}.csv",
-                "user": "data/csv/user_{month}.csv"
+                "loan_assign": "data/raw/csv/loan_assign_{month}.csv",
+                "loan_recovery": "data/raw/csv/loan_recovery_{month}.csv",
+                "package": "data/raw/csv/package_{month}.csv",
+                "recharge": "data/raw/csv/recharge_{month}.csv",
+                "cdr": "data/raw/csv/cdr_{month}.csv",
+                "user": "data/raw/csv/user_{month}.csv"
             },
             "parquet": {
-                "loan_assign": "data/parquet/loan_assign_{month}.parquet",
-                "loan_recovery": "data/parquet/loan_recovery_{month}.parquet",
-                "package": "data/parquet/package_{month}.parquet",
-                "recharge": "data/parquet/recharge_{month}.parquet",
-                "cdr": "data/parquet/cdr_{month}.parquet",
-                "user": "data/parquet/user_{month}.parquet"
+                "loan_assign": "data/raw/parquet/loan_assign_{month}.parquet",
+                "loan_recovery": "data/raw/parquet/loan_recovery_{month}.parquet",
+                "package": "data/raw/parquet/package_{month}.parquet",
+                "recharge": "data/raw/parquet/recharge_{month}.parquet",
+                "cdr": "data/raw/parquet/cdr_{month}.parquet",
+                "user": "data/raw/parquet/user_{month}.parquet"
             }
         },
         "convert_date_columns": {
-            "loan_assign": {
-                "timestamp_columns": [
-                    "date_timestamp"
-                ],
-                "date_columns": [
-                    "date_key"
-                ]
+            "loan_assign": { 
+                "timestamp_columns": ["date_timestamp"],
+                "date_columns": ["date_key"]
             },
             "loan_recovery": {
-                "timestamp_columns": [
-                    "date_timestamp"
-                ],
-                "date_columns": [
-                    "date_key"
-                ]
+                "timestamp_columns": ["date_timestamp"],
+                "date_columns": ["date_key"]
             },
             "package": {
-                "timestamp_columns": [
-                    "activation_date",
-                    "deactivation_date"
-                ],
-                "date_columns": [
-                    "date_key"
-                ]
+                "timestamp_columns": ["activation_date", "deactivation_date"],
+                "date_columns": ["date_key"]
             },
             "recharge": {
-                "timestamp_columns": [
-                    "recharge_dt"
-                ],
-                "date_columns": [
-                    "date_key"
-                ]
+                "timestamp_columns": ["recharge_dt"],
+                "date_columns": ["date_key"]
             },
             "cdr": {
                 "timestamp_columns": [],
-                "date_columns": [
-                    "date_key"
-                ]
+                "date_columns": ["date_key"]
             },
             "user": {
                 "timestamp_columns": [],
-                "date_columns": [
-                    "registration_date_d",
-                    "date_of_birth_d"
-                ]
+                "date_columns": ["registration_date_d","date_of_birth_d"]
             }
         }
     },
     "label": {
-        "paths": {
-            "base_path": "data/label",
-            "train": "data/label/train_38_39",
-            "test": "data/label/test_39_40"
-        }
+        "path": "data/intermediate/label/{type}_label.parquet"
+    },
+    "dataset": {
+        "path": "data/intermediate/dataset/dataset_{month}.parquet"
     }
 }

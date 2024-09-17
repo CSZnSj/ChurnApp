@@ -1,8 +1,6 @@
 import sys
 sys.path.append('/home/sajjad/Projects/ChurnApp')
 
-import os
-import json
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, max as spark_max, min as spark_min, datediff, when, greatest, least
 from src.logger import setup_logger
@@ -10,41 +8,6 @@ from src.utils import load_config, get_config_value, create_spark_session, read_
 
 # Initialize logger
 logger = setup_logger(__name__)
-
-import os
-
-def set_label_paths(config: dict) -> None:
-    """
-    Sets the train and test label paths in the config dictionary based on the months provided in the config.
-    
-    This function modifies the config in place by updating the 'train' and 'test' paths under the 'label' key.
-    
-    :param config: Configuration dictionary containing paths and months.
-    :raises KeyError: If any required key is missing in the config.
-    """
-    try:
-        # Retrieve base path and month information from config
-        base_path = config["label"]["paths"]["base_path"]
-        months = config["months"]
-
-        # Create train and test paths
-        train_path = os.path.join(base_path, f"train_{months[0]}_{months[1]}")
-        test_path = os.path.join(base_path, f"test_{months[1]}_{months[2]}")
-
-        # Update the config with train and test paths
-        config["label"]["paths"]["train"] = train_path
-        config["label"]["paths"]["test"] = test_path
-
-        # Optionally, save back to file if persistence is required
-        with open('config.json', 'w') as f:
-            json.dump(config, f, indent=4)
-
-        logger.info(f"Train and test label paths set in config: {train_path}, {test_path}")
-        return train_path, test_path
-
-    except KeyError as e:
-        logger.error(f"Error in setting label paths: Missing key in configuration: {e}")
-        raise
 
 def get_required_paths(
         config: dict, 
@@ -207,38 +170,59 @@ def generate_churn_label(
     return prepare_churn_label(*read_required_data(spark, config, current_month, next_month))
 
 def main():
+    """
+    Main function for preparing churn labels for train and test datasets.
+
+    This function:
+    1. Loads configuration from a JSON file.
+    2. Retrieves the list of months and base path for label files.
+    3. Creates a Spark session with appropriate settings.
+    4. Generates churn labels for both train and test datasets based on sequential months.
+    5. Writes the generated labels to Parquet files.
+
+    The Spark session is ensured to be stopped after the process, even in case of errors.
+
+    Raises:
+        FileNotFoundError: If the configuration file is not found.
+        Exception: Any other exceptions encountered during the process will be logged and re-raised.
+    """
     spark = None
     try:
         # Load configuration
         config = load_config("config.json")
-        train_label_path, test_label_path = set_label_paths(config)
+        months = get_config_value(config, "months")
+        base_path = get_config_value(config, "label", "path")
 
         # Create Spark session
         spark = create_spark_session("PrepareLabel")
+        # Set Spark config for writing Parquet with corrected datetime rebase mode
         spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
 
-        # Generate train and test labels
-        months = get_config_value(config, "months")
-        train_label_df = generate_churn_label(spark, config, months[0], months[1])
-        test_label_df = generate_churn_label(spark, config, months[1], months[2])
+        # Generate churn labels for train (first two months) and test (second and third months)
+        train_label_df = generate_churn_label(spark=spark, config=config, current_month=months[0], next_month=months[1])
+        test_label_df = generate_churn_label(spark=spark, config=config, current_month=months[1], next_month=months[2])
 
-        # Write the output Parquet files
-        write_parquet(train_label_df, train_label_path)
-        write_parquet(test_label_df, test_label_path)
+        # Write the generated churn labels to Parquet files
+        write_parquet(df=train_label_df, output_parquet_path=base_path.format(type="train"))
+        write_parquet(df=test_label_df, output_parquet_path=base_path.format(type="test"))
 
         logger.info("Label preparation completed successfully.")
 
     except FileNotFoundError as fnf_error:
-        logger.error(f"Config file not found: {fnf_error}")
-    except KeyError as key_error:
-        logger.error(f"Missing key in configuration: {key_error}")
+        # Handle missing config file
+        logger.error(f"Configuration file not found: {fnf_error}")
+        raise
     except Exception as e:
+        # Log any other exceptions and raise them
         logger.error(f"Failed to complete label preparation: {e}")
         raise
+
     finally:
+        # Ensure the Spark session is stopped, even in case of error
         if spark:
             spark.stop()
             logger.info("Spark session stopped.")
+
 
 if __name__ == "__main__":
     main()
