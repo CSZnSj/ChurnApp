@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/home/sajjad/Projects/ChurnApp')
+
 import json
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType
