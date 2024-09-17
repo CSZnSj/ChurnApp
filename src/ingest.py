@@ -1,14 +1,10 @@
-from src.logger import setup_logger
+# ingegst.py
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import (
     StructType, StructField, StringType, LongType, DoubleType, DecimalType
 )
-from pyspark.sql.functions import to_date, to_timestamp
-from src.utils import create_spark_session, load_config
-
-# Initialize logger
-logger = setup_logger(__name__, log_file='./output/logs/ingest.log')
-
+from src.logger import setup_logger
+from src.utils import *
 class CustomSchema:
     """Defines custom schemas for different datasets."""
     
@@ -83,51 +79,14 @@ class CustomSchema:
         StructField("sitei", StringType(), True)
     ])
 
-
-def read_csv_with_schema(spark: SparkSession, file_path: str, schema: StructType) -> DataFrame:
-    """
-    Reads a CSV file into a Spark DataFrame with the provided schema.
-    """
-    try:
-        logger.info(f"Reading CSV file: {file_path}")
-        df = spark.read.csv(file_path, header=True, schema=schema)
-        logger.info(f"Successfully read CSV file: {file_path}")
-        return df
-    except Exception as e:
-        logger.error(f"Error reading CSV file {file_path}: {e}")
-        raise
-
-
-def convert_date_columns(df: DataFrame, timestamp_columns=None, date_columns=None) -> DataFrame:
-    """
-    Converts specified columns to date or timestamp types.
-    """
-    if timestamp_columns is None:
-        timestamp_columns = []
-    if date_columns is None:
-        date_columns = ["date_key"]
-
-    # Convert timestamp columns
-    for col in timestamp_columns:
-        if col in df.columns:
-            df = df.withColumn(col, to_timestamp(col, "yyyyMMdd HH:mm:ss"))
-            logger.info(f"Converted column {col} to timestamp")
-
-    # Convert date columns
-    for col in date_columns:
-        if col in df.columns:
-            df = df.withColumn(col, to_date(col, "yyyyMMdd"))
-            logger.info(f"Converted column {col} to date")
-
-    return df
-
+# Initialize logger
+logger = setup_logger(__name__)
 
 def ingest_data(config: dict) -> None:
     """
     Orchestrates the data ingestion process from CSV to Parquet format.
     """
     logger.info("Starting data ingestion process...")
-    spark = None
     try:
         spark = create_spark_session("DataIngestion")
         spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
@@ -147,16 +106,15 @@ def ingest_data(config: dict) -> None:
                 df = convert_date_columns(df, timestamp_columns=timestamp_columns, date_columns=date_columns)
                 
                 logger.info(f"Writing {key} data to Parquet: {parquet_path}")
-                df.write.parquet(parquet_path, mode="overwrite")
+                write_parquet(df, parquet_path, mode = "overwrite")
                 logger.info(f"Successfully wrote {key} data for month {month}")
 
     except Exception as e:
         logger.error(f"Error during data ingestion: {e}")
         raise
     finally:
-        if spark:
-            spark.stop()
-            logger.info("Spark session stopped")
+        spark.stop()
+        logger.info("Spark session stopped")
 
 def main():
     try:
@@ -165,6 +123,7 @@ def main():
         logger.info("Data ingestion process completed successfully.")
     except Exception as e:
         logger.error(f"Failed to complete data ingestion: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

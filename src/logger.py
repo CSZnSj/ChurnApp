@@ -2,7 +2,7 @@
 import logging
 import sys
 
-def setup_logger(name: str, log_file: str = None, level=logging.INFO):
+def setup_logger(name: str, level=logging.INFO):
     """Function to set up a logger with the specified name and log file.
     
     Args:
@@ -37,12 +37,5 @@ def setup_logger(name: str, log_file: str = None, level=logging.INFO):
     
     # Add the console handler to the logger
     logger.addHandler(console_handler)
-    
-    # Optionally add a file handler if log_file is specified
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
     
     return logger
