@@ -94,22 +94,40 @@ def read_csv_with_schema(
     """
     Reads a CSV file into a Spark DataFrame using the provided schema.
 
-    This function reads a CSV file from the specified parquet_path into a Spark DataFrame
-    with a user-defined schema, ensuring the correct data types are enforced.
+    This function reads a CSV file from the specified csv_path into a Spark DataFrame
+    with a user-defined schema, ensuring the correct data types are enforced and that 
+    the CSV columns match the schema.
 
     :param spark: SparkSession instance used for reading the CSV file.
-    :param parquet_path: path to the CSV file.
+    :param csv_path: Path to the CSV file.
     :param schema: A StructType object defining the schema of the CSV.
     :return: DataFrame containing the data from the CSV file.
-    :raises: Exception if the file cannot be read or the schema is invalid.
+    :raises ValueError: If the columns of the CSV file do not match the schema.
+    :raises FileNotFoundError: If the file cannot be found.
+    :raises Exception: For any other errors during reading.
     """
     try:
-        logger.info(f"Attempting to read CSV file: {csv_path} with provided schema")
+        logger.info(f"Attempting to read CSV file: {csv_path}")
+
+        # Read the CSV file to infer its columns without applying the schema
+        temp_df = spark.read.csv(csv_path, header=True, inferSchema=True)
+        csv_columns = temp_df.columns
+        schema_columns = [field.name for field in schema]
+
+        # Check if the CSV columns match the schema columns
+        if set(csv_columns) != set(schema_columns):
+            raise ValueError(f"CSV columns {csv_columns} do not match schema columns {schema_columns}")
+
+        # If columns match, read the file using the provided schema
         df = spark.read.csv(csv_path, header=True, schema=schema)
-        logger.info(f"Successfully read CSV file from: {csv_path}")
+        logger.info(f"Successfully read CSV file from: {csv_path} with matching schema")
         return df
+
     except FileNotFoundError:
         logger.error(f"CSV file not found at: {csv_path}")
+        raise
+    except ValueError as ve:
+        logger.error(f"Column mismatch error: {ve}")
         raise
     except Exception as e:
         logger.error(f"Error occurred while reading CSV file at {csv_path}. Error: {e}")
