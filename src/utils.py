@@ -8,11 +8,12 @@ from src.logger import setup_logger
 # Initialize logger
 logger = setup_logger(__name__)
 
-def load_config(config_path: str = "config.json") -> dict:
+def load_config(
+        config_path: str = "config.json") -> dict:
     """
     Loads the configuration from a JSON file.
 
-    :param config_path: Path to the JSON configuration file (default is 'config.json').
+    :param config_path: parquet_path to the JSON configuration file (default is 'config.json').
     :return: Configuration dictionary.
     :raises: FileNotFoundError if the configuration file is not found.
              JSONDecodeError if the file is not a valid JSON.
@@ -33,7 +34,41 @@ def load_config(config_path: str = "config.json") -> dict:
         logger.error(f"Unexpected error loading config from {config_path}: {e}")
         raise
 
-def create_spark_session(app_name: str) -> SparkSession:
+def get_config_value(
+        config: dict, 
+        *keys: str):
+    """
+    Retrieves a nested value from a configuration dictionary using a variable number of keys.
+    
+    This function allows you to access deeply nested values in a dictionary based on a dynamic 
+    list of keys. It handles missing keys by logging an error and raising a KeyError.
+
+    Example usage:
+        get_config_value(config, "ingestion", "paths", "csv", "loan_assign")
+
+    :param config: The configuration dictionary to search.
+    :param keys: Variable-length list of keys to access the nested value.
+    :return: The value from the config if all keys are found.
+    :raises KeyError: If any of the provided keys do not exist in the dictionary.
+    """
+    try:
+        # Start with the entire configuration and narrow down based on the provided keys
+        value = config
+        for key in keys:
+            value = value[key]  # Traverse through the dictionary using the keys
+            
+        logger.info(f"Successfully retrieved config value for keys: {keys}")
+        return value
+    
+    except KeyError as e:
+        logger.error(f"Missing required key {e} in configuration: {' -> '.join(keys)}")
+        raise KeyError(f"Configuration key not found for: {' -> '.join(keys)}") from e
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving configuration value for keys {keys}: {e}")
+        raise
+
+def create_spark_session(
+        app_name: str) -> SparkSession:
     """
     Creates and returns a SparkSession with the specified application name.
 
@@ -49,106 +84,140 @@ def create_spark_session(app_name: str) -> SparkSession:
         logger.error(f"Failed to create Spark session for app: {app_name}. Error: {e}")
         raise
 
-def read_csv_with_schema(spark: SparkSession, file_path: str, schema: StructType) -> DataFrame:
+def read_csv_with_schema(
+        spark: SparkSession, 
+        csv_path: str, 
+        schema: StructType) -> DataFrame:
     """
     Reads a CSV file into a Spark DataFrame using the provided schema.
 
-    This function reads a CSV file from the specified path into a Spark DataFrame
+    This function reads a CSV file from the specified parquet_path into a Spark DataFrame
     with a user-defined schema, ensuring the correct data types are enforced.
 
     :param spark: SparkSession instance used for reading the CSV file.
-    :param file_path: Path to the CSV file.
+    :param parquet_path: path to the CSV file.
     :param schema: A StructType object defining the schema of the CSV.
     :return: DataFrame containing the data from the CSV file.
     :raises: Exception if the file cannot be read or the schema is invalid.
     """
     try:
-        logger.info(f"Attempting to read CSV file: {file_path} with provided schema")
-        df = spark.read.csv(file_path, header=True, schema=schema)
-        logger.info(f"Successfully read CSV file from: {file_path}")
+        logger.info(f"Attempting to read CSV file: {csv_path} with provided schema")
+        df = spark.read.csv(csv_path, header=True, schema=schema)
+        logger.info(f"Successfully read CSV file from: {csv_path}")
         return df
     except FileNotFoundError:
-        logger.error(f"CSV file not found at: {file_path}")
+        logger.error(f"CSV file not found at: {csv_path}")
         raise
     except Exception as e:
-        logger.error(f"Error occurred while reading CSV file at {file_path}. Error: {e}")
+        logger.error(f"Error occurred while reading CSV file at {csv_path}. Error: {e}")
         raise
 
-def convert_date_columns(df: DataFrame, timestamp_columns=None, date_columns=None) -> DataFrame:
+def convert_date_columns(
+    df: DataFrame, 
+    csv_path: str, 
+    timestamp_columns: list = None, 
+    date_columns: list = None
+) -> DataFrame:
     """
-    Converts specified columns to date or timestamp types.
+    Converts specified columns in a DataFrame to date or timestamp types.
 
-    :param df: The input DataFrame.
-    :param timestamp_columns: List of columns to be converted to timestamp type (default is None).
-    :param date_columns: List of columns to be converted to date type (default is ["date_key"]).
-    :return: DataFrame with the converted date/timestamp columns.
-    :raises: Exception if column conversion fails.
+    This function processes the specified timestamp and date columns in a DataFrame and converts them
+    into `timestamp` and `date` data types respectively. If a column is not found in the DataFrame, it logs a warning
+    and skips the conversion. 
+
+    :param df: The input DataFrame to be processed.
+    :param csv_path: Path of the CSV file from which the DataFrame was read, used for logging purposes.
+    :param timestamp_columns: List of columns to be converted to `timestamp` type. Default is an empty list.
+    :param date_columns: List of columns to be converted to `date` type. Default is `["date_key"]`.
+    
+    :return: A DataFrame with the converted date and timestamp columns.
+    
+    :raises AnalysisException: If a column conversion fails due to invalid format.
+    :raises Exception: For any other unexpected errors during the conversion process.
     """
-    if timestamp_columns is None:
-        timestamp_columns = []
-    if date_columns is None:
-        date_columns = ["date_key"]
+    
+    # Set default values for columns if not provided
+    timestamp_columns = timestamp_columns or []
+    date_columns = date_columns or ["date_key"]
 
+    def convert_column(col_name: str, format_str: str, conversion_func) -> DataFrame:
+        """
+        Helper function to convert a column to the specified format using a provided function.
+
+        :param col_name: The name of the column to be converted.
+        :param format_str: The format string for the conversion (e.g., 'yyyyMMdd HH:mm:ss').
+        :param conversion_func: The function to apply for conversion (e.g., `to_timestamp` or `to_date`).
+        :return: DataFrame with the converted column.
+        """
+        if col_name in df.columns:
+            df_with_converted_column = df.withColumn(col_name, conversion_func(col_name, format_str))
+            logger.info(f"Successfully converted column '{col_name}' in {csv_path} to {conversion_func.__name__}.")
+            return df_with_converted_column
+        else:
+            logger.warning(f"Column '{col_name}' not found in {csv_path}. Skipping conversion.")
+            return df
+    
     try:
         # Convert timestamp columns
         for col in timestamp_columns:
-            if col in df.columns:
-                df = df.withColumn(col, to_timestamp(col, "yyyyMMdd HH:mm:ss"))
-                logger.info(f"Converted column {col} to timestamp")
-
+            df = convert_column(col, "yyyyMMdd HH:mm:ss", to_timestamp)
+        
         # Convert date columns
         for col in date_columns:
-            if col in df.columns:
-                df = df.withColumn(col, to_date(col, "yyyyMMdd"))
-                logger.info(f"Converted column {col} to date")
-
+            df = convert_column(col, "yyyyMMdd", to_date)
+        
         return df
-    except Exception as e:
-        logger.error(f"Error converting date/timestamp columns. Error: {e}")
+
+    except AnalysisException as ae:
+        logger.error(f"Failed to convert date/timestamp columns in {csv_path} due to an analysis error: {ae}")
         raise
 
-def write_parquet(df: DataFrame, output_path: str, mode: str = "overwrite") -> None:
+    except Exception as e:
+        logger.exception(f"Unexpected error during date/timestamp conversion in {csv_path}: {e}")
+        raise
+
+def write_parquet(df: DataFrame, output_parquet_path: str, mode: str = "overwrite") -> None:
     """
     Writes a DataFrame to a Parquet file.
 
     :param df: The DataFrame to write.
-    :param output_path: The output path where the Parquet file will be saved.
+    :param output_parquet_path: The output parquet_path where the Parquet file will be saved.
     :param mode: Save mode (default is 'overwrite'). Options: 'append', 'overwrite', 'ignore', 'error'.
     :raises: Exception if writing the Parquet file fails.
     """
     try:
-        df.write.mode(mode).parquet(output_path)
-        logger.info(f"DataFrame successfully written to Parquet at: {output_path} with mode: {mode}")
+        df.write.mode(mode).parquet(output_parquet_path)
+        logger.info(f"DataFrame successfully written to Parquet at: {output_parquet_path} with mode: {mode}")
     except Exception as e:
-        logger.error(f"Failed to write DataFrame to Parquet at {output_path}. Error: {e}")
+        logger.error(f"Failed to write DataFrame to Parquet at {output_parquet_path}. Error: {e}")
         raise
 
-def read_parquet(spark: SparkSession, file_path: str) -> DataFrame:
+def read_parquet(spark: SparkSession, parquet_path: str) -> DataFrame:
     """
     Reads a Parquet file into a Spark DataFrame.
 
-    This function reads data from a Parquet file located at the specified path and
+    This function reads data from a Parquet file located at the specified parquet_path and
     loads it into a Spark DataFrame. It ensures proper error handling and logging
     for troubleshooting.
 
     :param spark: The SparkSession instance used for reading the Parquet file.
-    :param file_path: Path to the Parquet file.
+    :param parquet_path: path to the Parquet file.
     :return: DataFrame containing the data from the Parquet file.
     :raises: FileNotFoundError if the file does not exist.
              AnalysisException for issues related to reading the Parquet format.
              Exception for any other unexpected errors.
     """
     try:
-        logger.info(f"Attempting to read Parquet file from: {file_path}")
-        df = spark.read.parquet(file_path)
-        logger.info(f"Successfully read Parquet file from: {file_path}")
+        logger.info(f"Attempting to read Parquet file from: {parquet_path}")
+        df = spark.read.parquet(parquet_path)
+        logger.info(f"Successfully read Parquet file from: {parquet_path}")
         return df
     except AnalysisException as ae:
-        logger.error(f"Error reading Parquet file at {file_path}. Issue with file format or path. Error: {ae}")
+        logger.error(f"Error reading Parquet file at {parquet_path}. Issue with file format or parquet_path. Error: {ae}")
         raise
     except FileNotFoundError:
-        logger.error(f"Parquet file not found at: {file_path}")
+        logger.error(f"Parquet file not found at: {parquet_path}")
         raise
     except Exception as e:
-        logger.error(f"Unexpected error occurred while reading Parquet file at {file_path}. Error: {e}")
+        logger.error(f"Unexpected error occurred while reading Parquet file at {parquet_path}. Error: {e}")
         raise

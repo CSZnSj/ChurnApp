@@ -82,48 +82,72 @@ class CustomSchema:
 # Initialize logger
 logger = setup_logger(__name__)
 
-def ingest_data(config: dict) -> None:
+def ingest_data(spark: SparkSession, config: dict) -> None:
     """
     Orchestrates the data ingestion process from CSV to Parquet format.
+
+    :param spark: SparkSession instance used for the data ingestion process.
+    :param config: Configuration dictionary containing paths and column info.
     """
     logger.info("Starting data ingestion process...")
     try:
-        spark = create_spark_session("DataIngestion")
-        spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
-        
-        months = config.get("months", [])
-        keys = config.get("keys", [])
-        ingestion_config = config.get("ingestion", {})
+        # Retrieve values from config using get_config_value to handle errors if keys are missing
+        months = get_config_value(config, "months")
+        keys = get_config_value(config, "keys")
 
         for month in months:
             for key in keys:
-                csv_path = ingestion_config["paths"]["csv"][key].format(month=month)
-                parquet_path = ingestion_config["paths"]["parquet"][key].format(month=month)
-                timestamp_columns = ingestion_config["convert_date_columns"].get(key, {}).get("timestamp_columns", [])
-                date_columns = ingestion_config["convert_date_columns"].get(key, {}).get("date_columns", [])
+                # Get the CSV and Parquet paths from the config using get_config_value
+                csv_path = get_config_value(config, "ingestion", "paths", "csv", key).format(month=month)
+                parquet_path = get_config_value(config, "ingestion", "paths", "parquet", key).format(month=month)
 
-                df = read_csv_with_schema(spark, csv_path, getattr(CustomSchema, key))
-                df = convert_date_columns(df, timestamp_columns=timestamp_columns, date_columns=date_columns)
-                
-                logger.info(f"Writing {key} data to Parquet: {parquet_path}")
-                write_parquet(df, parquet_path, mode = "overwrite")
-                logger.info(f"Successfully wrote {key} data for month {month}")
+                # Get the columns for timestamp and date conversion
+                timestamp_columns = get_config_value(config, "ingestion", "convert_date_columns", key, "timestamp_columns")
+                date_columns = get_config_value(config, "ingestion", "convert_date_columns", key, "date_columns")
 
+                # Read CSV file into a DataFrame
+                df = read_csv_with_schema(spark=spark, csv_path=csv_path, schema=getattr(CustomSchema, key))
+
+                # Convert timestamp and date columns
+                df = convert_date_columns(df=df, csv_path=csv_path, timestamp_columns=timestamp_columns, date_columns=date_columns)
+
+                # Write the DataFrame to Parquet
+                write_parquet(df, parquet_path, mode="overwrite")
+
+                logger.info(f"Successfully processed and saved data for key {key} for month {month}.")
+
+    except KeyError as e:
+        logger.error(f"Missing configuration key: {e}")
+        raise
     except Exception as e:
         logger.error(f"Error during data ingestion: {e}")
         raise
-    finally:
-        spark.stop()
-        logger.info("Spark session stopped")
 
 def main():
+    """
+    Main function to orchestrate the entire data ingestion process.
+    Handles Spark session creation and cleanup.
+    """
+    spark = None
     try:
+        # Load configuration
         config = load_config("config.json")
-        ingest_data(config)
-        logger.info("Data ingestion process completed successfully.")
+
+        # Create Spark session
+        spark = create_spark_session("DataIngestion")
+        spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
+
+        # Call the ingestion function with the Spark session and configuration
+        ingest_data(spark, config)
+
     except Exception as e:
         logger.error(f"Failed to complete data ingestion: {e}")
         raise
+    finally:
+        # Stop Spark session if it was started
+        if spark:
+            spark.stop()
+            logger.info("Spark session stopped.")
 
 if __name__ == "__main__":
     main()
