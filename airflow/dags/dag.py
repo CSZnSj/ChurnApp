@@ -1,18 +1,19 @@
+# dag.py
+
 import sys
+sys.path.append('/home/sajjad/Projects/ChurnApp')
+
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# Add the project path to sys.path
-sys.path.append('/home/sajjad/Projects/ChurnApp')
-
-# Import the functions to be executed
 from src.ingest import main as ingest_main
 from src.prepare_label import main as prepare_label_main
+from src.prepare_dataset import main as prepare_dataset_main
 
 # Define the DAG
 dag = DAG(
-    'ingest_and_prepare_label_dag',
+    'flow_dag',
     start_date=datetime(2024, 9, 16),
     catchup=False,
     schedule_interval=None,
@@ -33,5 +34,12 @@ prepare_label_task = PythonOperator(
     dag=dag
 )
 
+# Task 3: Run the prepare_dataset script
+prepare_dataset_task = PythonOperator(
+    task_id='prepare_dataset_task',
+    python_callable=prepare_dataset_main,
+    dag=dag
+)
+
 # Set task dependencies
-ingest_task >> prepare_label_task
+ingest_task >> prepare_label_task >> prepare_dataset_task
