@@ -3,14 +3,12 @@
 import sys
 sys.path.append('/home/sajjad/Projects/ChurnApp')
 
-import os
-import json
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, year, current_date, datediff, median, count
 from pyspark.sql.utils import AnalysisException
 from typing import Tuple
 from src.logger import setup_logger
-from src.utils import load_config, get_config_value, create_spark_session, write_parquet, read_parquet
+from src.utils import load_config, get_config_value, create_spark_session, write_parquet, read_parquet, remove_data
 
 logger = setup_logger(__name__)
 
@@ -293,8 +291,8 @@ def main():
     2. Retrieves the list of months to process and the paths for reading and writing data.
     3. Creates a Spark session with appropriate settings.
     4. Iterates over the months to process, generating a dataset for each month.
-    5. Removes the used label files to optimize storage.
-    6. Writes the generated datasets to Parquet files.
+    5. Writes the generated datasets to Parquet files.
+    6. Removes the used label files to optimize storage.
 
     The Spark session is ensured to be stopped after the process, even in case of errors.
 
@@ -326,11 +324,11 @@ def main():
             # Generate the dataset for the given month
             dataset_df = generate_dataset(spark=spark, config=config, month=month, churn_label_df=churn_label_df)
 
-            # Remove the read label file to optimize storage
-            # remove_file(file_path=read_path)
-
             # Write the generated dataset to a Parquet file
             write_parquet(df=dataset_df, output_parquet_path=write_path)
+
+            # Remove the read label file to optimize storage
+            remove_data(data_path=read_path)
 
         logger.info("Dataset preparation completed successfully.")
 

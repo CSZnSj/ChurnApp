@@ -118,6 +118,9 @@ def ingest_data(spark: SparkSession, config: dict) -> None:
                 # Write the DataFrame to Parquet
                 write_parquet(df, parquet_path, mode="overwrite")
 
+                # Remove the read csv file to optimize storage
+                remove_data(data_path=csv_path)
+
                 logger.info(f"Successfully processed and saved data for key {key} for month {month}.")
 
     except KeyError as e:
@@ -130,28 +133,44 @@ def ingest_data(spark: SparkSession, config: dict) -> None:
 def main():
     """
     Main function to orchestrate the entire data ingestion process.
-    Handles Spark session creation and cleanup.
+
+    This function:
+    1. Loads the configuration from a JSON file.
+    2. Creates a Spark session with appropriate settings.
+    3. Calls the data ingestion process with the provided configuration.
+    4. Ensures that the Spark session is properly stopped after execution.
+
+    Raises:
+        FileNotFoundError: If the configuration file is missing.
+        Exception: Any other errors encountered during the ingestion process are logged and re-raised.
     """
     spark = None
     try:
-        # Load configuration
+        # Step 1: Load configuration
         config = load_config("config.json")
 
-        # Create Spark session
+        # Step 2: Create Spark session
         spark = create_spark_session("DataIngestion")
+        # Set Spark configuration for Parquet datetime handling
         spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
 
-        # Call the ingestion function with the Spark session and configuration
+        # Step 4: Call the data ingestion function
         ingest_data(spark, config)
 
+    except FileNotFoundError as fnf_error:
+        # Handle missing configuration file
+        logger.error(f"Configuration file not found: {fnf_error}")
+        raise
     except Exception as e:
+        # Log any other exceptions during data ingestion
         logger.error(f"Failed to complete data ingestion: {e}")
         raise
     finally:
-        # Stop Spark session if it was started
+        # Step 5: Ensure the Spark session is stopped, even in case of an error
         if spark:
             spark.stop()
             logger.info("Spark session stopped.")
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,8 @@
 import sys
 sys.path.append('/home/sajjad/Projects/ChurnApp')
 
+import os
+import shutil
 import json
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType
@@ -241,4 +243,59 @@ def read_parquet(spark: SparkSession, parquet_path: str) -> DataFrame:
         raise
     except Exception as e:
         logger.error(f"Unexpected error occurred while reading Parquet file at {parquet_path}. Error: {e}")
+        raise
+
+def remove_data(data_path: str) -> None:
+    """
+    Removes the specified Parquet directory or CSV file.
+
+    Parameters:
+    ----------
+    data_path : str
+        The path to the Parquet directory or CSV file that needs to be removed.
+
+    Raises:
+    ------
+    FileNotFoundError:
+        If the provided path does not exist.
+    PermissionError:
+        If the function does not have the necessary permissions to remove the file or directory.
+    Exception:
+        For any other errors that may occur during the removal process.
+
+    Notes:
+    ------
+    - Parquet files are typically stored as directories, so this function removes the entire directory.
+    - CSV files are single files, so this function removes just the file.
+    
+    Example:
+    --------
+    >>> remove_data_path("/path/to/parquet_or_csv")
+    """
+    try:
+        # Check if the path exists
+        if not os.path.exists(data_path):
+            logger.warning(f"Path does not exist: {data_path}")
+            raise FileNotFoundError(f"Path not found: {data_path}")
+
+        # Check if the path is a directory (for Parquet files)
+        if os.path.isdir(data_path):
+            # Remove the entire directory (Parquet case)
+            shutil.rmtree(data_path)
+            logger.info(f"Successfully removed Parquet directory: {data_path}")
+        else:
+            # Remove a single file (CSV case)
+            os.remove(data_path)
+            logger.info(f"Successfully removed CSV file: {data_path}")
+
+    except FileNotFoundError as fnf_err:
+        logger.error(f"FileNotFoundError: {fnf_err}")
+        raise
+
+    except PermissionError as perm_err:
+        logger.error(f"PermissionError: {perm_err}")
+        raise
+
+    except Exception as e:
+        logger.error(f"An error occurred while removing the path: {e}")
         raise
