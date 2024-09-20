@@ -239,7 +239,9 @@ def merge_dataframes(
         .join(recovery_df, on="bib_id", how="left") \
         .join(package_df, on="bib_id", how="left") \
         .join(recharge_df, on="bib_id", how="left") \
-        .join(user_df, on="bib_id", how="left")
+        .fillna(0) \
+        .join(user_df, on="bib_id", how="left") \
+        .drop("bib_id")
 
     logger.info("Successfully merged all DataFrames")
     return merged_df
