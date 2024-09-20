@@ -90,3 +90,6 @@ standalone_admin_password.txt
 
 # Data folder
 data/
+
+# models
+result/models
