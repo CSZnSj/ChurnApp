@@ -69,5 +69,9 @@
     },
     "model": {
         "path": "result/models/{name}"
+    },
+    "predictions": {
+        "path": "result/predictions/{name}.parquet"
     }
+
 }

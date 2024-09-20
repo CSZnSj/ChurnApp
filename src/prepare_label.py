@@ -198,13 +198,13 @@ def main():
         # Set Spark config for writing Parquet with corrected datetime rebase mode
         spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
 
-        # Generate churn labels for train (first two months) and test (second and third months)
+        # Generate churn labels for train (first two months) and eval (second and third months)
         train_label_df = generate_churn_label(spark=spark, config=config, current_month=months[0], next_month=months[1])
-        test_label_df = generate_churn_label(spark=spark, config=config, current_month=months[1], next_month=months[2])
+        eval_label_df = generate_churn_label(spark=spark, config=config, current_month=months[1], next_month=months[2])
 
         # Write the generated churn labels to Parquet files
         write_parquet(df=train_label_df, output_parquet_path=base_path.format(type="train"))
-        write_parquet(df=test_label_df, output_parquet_path=base_path.format(type="test"))
+        write_parquet(df=eval_label_df, output_parquet_path=base_path.format(type="eval"))
 
         logger.info("Label preparation completed successfully.")
 

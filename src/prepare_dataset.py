@@ -4,7 +4,7 @@ import sys
 sys.path.append('/home/sajjad/Projects/ChurnApp')
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, year, current_date, datediff, median, count
+from pyspark.sql.functions import col, year, current_date, datediff, median, count, lit
 from pyspark.sql.utils import AnalysisException
 from typing import Tuple
 from src.logger import setup_logger
@@ -241,8 +241,7 @@ def merge_dataframes(
         .join(recharge_df, on="bib_id", how="left") \
         .fillna(0) \
         .join(user_df, on="bib_id", how="left") \
-        .drop("bib_id")
-
+        
     logger.info("Successfully merged all DataFrames")
     return merged_df
 
@@ -250,16 +249,19 @@ def generate_dataset(
     spark: SparkSession,
     config: dict,
     month: str,
-    churn_label_df: DataFrame
+    churn_label_df: DataFrame = None,
 ) -> DataFrame:
     """
     Generates a dataset by reading required data, preparing it, and merging it with churn labels df.
+    
+    If churn_label_df is not provided, it generates a temporary dataset with "deploy" labels using an outer join of
+    package_df and recharge_df on bib_id.
 
     Args:
         spark (SparkSession): Active Spark session.
         config (dict): Configuration dictionary containing file paths or other relevant parameters.
         month (str): Month string to locate the specific data.
-        churn_label_df (DataFrame): DataFrame containing churn labels.
+        churn_label_df (DataFrame): DataFrame containing churn labels. If not provided, a temporary "deploy" dataset will be created.
 
     Returns:
         DataFrame: Final prepared and merged dataset for modeling.
@@ -270,11 +272,19 @@ def generate_dataset(
     try:
         # Step 1: Read required data
         assign_df, recovery_df, package_df, recharge_df, user_df = read_required_data(spark, config, month)
+
+        # Step 2: Handle deploy case by creating temporary labels
+        if churn_label_df is None:
+            logger.info("No churn labels provided, generating deploy dataset")
+            churn_label_df = package_df.join(recharge_df, on="bib_id", how="outer").select("bib_id")
+            churn_label_df = churn_label_df.withColumn("label", lit("deploy"))  # Set label to temporary value 'deploy'
+
+        # Step 3: Prepare each dataset
+        assign_df, recovery_df, package_df, recharge_df, user_df = prepare_data(
+            assign_df, recovery_df, package_df, recharge_df, user_df
+        )
         
-        # Step 2: Prepare each dataset
-        assign_df, recovery_df, package_df, recharge_df, user_df = prepare_data(assign_df, recovery_df, package_df, recharge_df, user_df)
-        
-        # Step 3: Merge all DataFrames with churn labels
+        # Step 4: Merge all DataFrames with churn labels
         merged_df = merge_dataframes(assign_df, recovery_df, package_df, recharge_df, user_df, churn_label_df)
         
         logger.info("Dataset generated successfully for month: %s", month)
@@ -310,18 +320,22 @@ def main():
         write_path_template = get_config_value(config, "dataset", "path")
 
         # Create Spark session
-        spark = create_spark_session("DataIngestion")
+        spark = create_spark_session("DatasetPreparation")
         # Set Spark config for writing Parquet with corrected datetime rebase mode
         spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
 
         # Loop through months and data types (train, test)
-        for month, data_type in zip(months[:-1], ["train", "test"]):
+        for month, data_type in zip(months, ["train", "eval", "test"]):
             # Format paths using the current month and data type
-            read_path = read_path_template.format(type=data_type)
-            write_path = write_path_template.format(month=month)
+            read_path = None
+            if data_type != "test":
+                read_path = read_path_template.format(type=data_type)
+            write_path = write_path_template.format(type=data_type)
 
             # Read churn label DataFrame from the Parquet file
-            churn_label_df = read_parquet(spark=spark, parquet_path=read_path)
+            churn_label_df = None
+            if read_path:
+                churn_label_df = read_parquet(spark=spark, parquet_path=read_path)
 
             # Generate the dataset for the given month
             dataset_df = generate_dataset(spark=spark, config=config, month=month, churn_label_df=churn_label_df)
@@ -330,7 +344,8 @@ def main():
             write_parquet(df=dataset_df, output_parquet_path=write_path)
 
             # Remove the read label file to optimize storage
-            remove_data(data_path=read_path)
+            if read_path:
+                remove_data(data_path=read_path)
 
         logger.info("Dataset preparation completed successfully.")
 
