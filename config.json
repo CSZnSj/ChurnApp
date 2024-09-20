@@ -62,6 +62,12 @@
         "path": "data/intermediate/label/{type}_label.parquet"
     },
     "dataset": {
-        "path": "data/intermediate/dataset/dataset_{month}.parquet"
+        "path": "data/intermediate/dataset/dataset_{type}.parquet"
+    },
+    "preprocessed": {
+        "path": "data/preprocessed/preprocessed_dataset_{type}.parquet"
+    },
+    "model": {
+        "path": "result/models/{name}"
     }
 }
