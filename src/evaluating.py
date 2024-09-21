@@ -11,8 +11,8 @@ from src.model_utils import load_model, get_evaluator, evaluate_model
 logger = setup_logger(__name__)
 
 def main(
-        model_name: str = "gbt", 
-        metric_name: str = "f1") -> None:
+        model_name: str, 
+        metric_name: str) -> None:
     """
     Main function for evaluating a trained machine learning model on eval data.
 

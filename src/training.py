@@ -1,6 +1,7 @@
 # training.py
 
 import sys
+import os
 sys.path.append('/home/sajjad/Projects/ChurnApp')
 
 from pyspark.sql import SparkSession, DataFrame
@@ -13,8 +14,8 @@ from src.model_utils import *
 logger = setup_logger(__name__)
 
 def main(
-        model_name: str = "gbt", 
-        metric_name: str = "f1") -> None:
+        model_name: str, 
+        metric_name: str) -> None:
     """
     Main function for the model training process.
 
@@ -24,13 +25,14 @@ def main(
 
     Steps:
         1. Load configuration from the config file.
-        2. Create a Spark session.
-        3. Load preprocessed training data.
-        4. Initialize the classifier and parameter grid for hyperparameter tuning.
-        5. Define the evaluator for model evaluation.
-        6. Train the model using cross-validation.
-        7. Evaluate the model on the training data.
-        8. Save the trained model to the specified output path.
+        2. Check if the model already exists; if so, skip training.
+        3. Create a Spark session.
+        4. Load preprocessed training data.
+        5. Initialize the classifier and parameter grid for hyperparameter tuning.
+        6. Define the evaluator for model evaluation.
+        7. Train the model using cross-validation.
+        8. Evaluate the model on the training data.
+        9. Save the trained model to the specified output path.
     """
 
     logger.info(f"Starting training with model: {model_name}, metric: {metric_name}")
@@ -44,35 +46,40 @@ def main(
         preprocessed_dataset_input_path = get_config_value(config, "preprocessed", "path").format(type="train")
         model_output_path = get_config_value(config, "model", "path").format(name=f"{model_name}__{metric_name}")
 
-        # Step 2: Create Spark session
+        # Step 2: Check if the model already exists
+        if os.path.exists(model_output_path):
+            logger.info(f"Model already exists at {model_output_path}. Skipping training.")
+            return
+        
+        # Step 3: Create Spark session
         spark = create_spark_session(app_name="Model Training")
         spark.conf.set("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
 
-        # Step 3: Load training data
+        # Step 4: Load training data
         train_df = read_parquet(spark=spark, parquet_path=preprocessed_dataset_input_path)
 
-        # Step 4: Define the classifier and parameter grid
+        # Step 5: Define the classifier and parameter grid
         logger.info(f"Step 4: Initializing classifier and parameter grid for {model_name}.")
         classifier = get_classifier(model_name=model_name)
         param_grid = get_param_grid(model_name=model_name)
 
-        # Step 5: Define the evaluator for model performance measurement
+        # Step 6: Define the evaluator for model performance measurement
         logger.info(f"Step 5: Defining evaluator based on the {metric_name} metric.")
         evaluator = get_evaluator(metric_name=metric_name)
 
-        # Step 6: Train the model using the training data
+        # Step 7: Train the model using the training data
         logger.info("Step 6: Training the model using cross-validation.")
         model = train_model(model=classifier, df=train_df, evaluator=evaluator, param_grid=param_grid)
 
-        # Step 7: Evaluate the model
+        # Step 8: Evaluate the model
         logger.info("Step 7: Evaluating the model on the training data.")
         evaluate_model(model=model, df=train_df, evaluator=evaluator, metric_name=metric_name)
 
-        # Step 8: Save the trained model to the specified output path
+        # Step 9: Save the trained model to the specified output path
         logger.info(f"Step 8: Saving the trained model to {model_output_path}.")
         save_model(model=model, output_path=model_output_path)
 
-        logger.info(f" Training model: {model_name}, metric: {metric_name} is finished successully")
+        logger.info(f" Training model: {model_name}, metric: {metric_name} is finished successfully")
 
     except Exception as e:
         # Catch and log any exception that occurs during the process

@@ -31,8 +31,8 @@ def make_predictions(model, df: DataFrame) -> DataFrame:
         raise
 
 def main(
-        model_name: str = "gbt", 
-        metric_name: str = "f1") -> None:
+        model_name: str, 
+        metric_name: str) -> None:
     """
     Main function to deploy the model and generate predictions.
 

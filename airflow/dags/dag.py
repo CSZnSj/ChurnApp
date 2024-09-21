@@ -49,6 +49,10 @@ prepare_dataset_task = PythonOperator(
 training_task = PythonOperator(
     task_id='training_task',
     python_callable=training_main,
+    op_kwargs={
+        'model_name': 'gbt',
+        'metric_name': 'f1',
+    },
     dag=dag
 )
 
@@ -56,6 +60,10 @@ training_task = PythonOperator(
 evaluating_task = PythonOperator(
     task_id='evaluating_task',
     python_callable=evaluating_main,
+    op_kwargs={
+        'model_name': 'gbt',
+        'metric_name': 'f1',
+    },
     dag=dag
 )
 
@@ -63,6 +71,10 @@ evaluating_task = PythonOperator(
 deploying_task = PythonOperator(
     task_id='deploying_task',
     python_callable=deploying_main,
+    op_kwargs={
+        'model_name': 'gbt',
+        'metric_name': 'f1',
+    },
     dag=dag
 )
 
