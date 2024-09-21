@@ -10,6 +10,10 @@ from airflow.operators.python import PythonOperator
 from src.ingest import main as ingest_main
 from src.prepare_label import main as prepare_label_main
 from src.prepare_dataset import main as prepare_dataset_main
+from src.training import main as training_main
+from src.evaluating import main as evaluating_main
+from src.deploying import main as deploying_main
+
 
 # Define the DAG
 dag = DAG(
@@ -41,5 +45,26 @@ prepare_dataset_task = PythonOperator(
     dag=dag
 )
 
+# Task 4: Run the training script
+training_task = PythonOperator(
+    task_id='training_task',
+    python_callable=training_main,
+    dag=dag
+)
+
+# Task 5: Run the evaluating script
+evaluating_task = PythonOperator(
+    task_id='evaluating_task',
+    python_callable=evaluating_main,
+    dag=dag
+)
+
+# Task 6: Run the deploying script
+deploying_task = PythonOperator(
+    task_id='deploying_task',
+    python_callable=deploying_main,
+    dag=dag
+)
+
 # Set task dependencies
-ingest_task >> prepare_label_task >> prepare_dataset_task
+ingest_task >> prepare_label_task >> prepare_dataset_task >> training_task >> evaluating_task >> deploying_task

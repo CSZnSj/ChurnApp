@@ -10,7 +10,9 @@ from src.model_utils import load_model, get_evaluator, evaluate_model
 
 logger = setup_logger(__name__)
 
-def main(model_name: str, metric_name: str) -> None:
+def main(
+        model_name: str = "gbt", 
+        metric_name: str = "f1") -> None:
     """
     Main function for evaluating a trained machine learning model on eval data.
 
@@ -26,6 +28,9 @@ def main(model_name: str, metric_name: str) -> None:
         5. Define the evaluator for model performance measurement.
         6. Evaluate the model on the eval data.
     """
+
+    logger.info(f"Starting evaluation with model: {model_name}, metric: {metric_name}")
+
     spark = None  # Initialize Spark session variable
     try:
         # Step 1: Load configuration
@@ -55,6 +60,8 @@ def main(model_name: str, metric_name: str) -> None:
         logger.info(f"Step 6: Evaluating the model using the {metric_name} metric.")
         evaluate_model(model=model, df=eval_df, evaluator=evaluator, metric_name=metric_name)
 
+        logger.info(f"Evaluation model: {model_name}, metric: {metric_name} is finished successfully")
+
     except Exception as e:
         # Catch and log any exceptions during the process
         logger.error(f"An error occurred during the evaluation process: {str(e)}")
@@ -67,14 +74,4 @@ def main(model_name: str, metric_name: str) -> None:
             logger.info("Spark session stopped.")
 
 if __name__ == '__main__':
-    """
-    Entry point for the evaluation script. Define the model name and metric,
-    and call the main function to evaluate the model's performance on eval data.
-    """
-    # Define the model and metric to use for evaluation
-    model_name = "gbt"  # e.g., Gradient Boosted Trees
-    metric_name = "f1"  # e.g., F1-score as the evaluation metric
-
-    # Start the evaluation process
-    logger.info(f"Starting evaluation with model: {model_name}, metric: {metric_name}")
-    main(model_name, metric_name)
+    main()

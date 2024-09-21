@@ -12,7 +12,9 @@ from src.model_utils import *
 # Set up logger
 logger = setup_logger(__name__)
 
-def main(model_name: str, metric_name: str) -> None:
+def main(
+        model_name: str = "gbt", 
+        metric_name: str = "f1") -> None:
     """
     Main function for the model training process.
 
@@ -30,6 +32,9 @@ def main(model_name: str, metric_name: str) -> None:
         7. Evaluate the model on the training data.
         8. Save the trained model to the specified output path.
     """
+
+    logger.info(f"Starting training with model: {model_name}, metric: {metric_name}")
+    
     spark = None  # Initialize spark session variable
     try:
         # Step 1: Load configuration
@@ -67,6 +72,8 @@ def main(model_name: str, metric_name: str) -> None:
         logger.info(f"Step 8: Saving the trained model to {model_output_path}.")
         save_model(model=model, output_path=model_output_path)
 
+        logger.info(f" Training model: {model_name}, metric: {metric_name} is finished successully")
+
     except Exception as e:
         # Catch and log any exception that occurs during the process
         logger.error(f"An error occurred during the training process: {str(e)}")
@@ -79,14 +86,4 @@ def main(model_name: str, metric_name: str) -> None:
             logger.info("Spark session stopped.")
 
 if __name__ == '__main__':
-    """
-    Entry point for the training script. Define the model name and metric,
-    and call the main function to execute the training process.
-    """
-    # Model and metric can be changed based on user requirements
-    model_name = "gbt"  # e.g., Gradient Boosted Trees
-    metric_name = "f1"  # e.g., F1-score as the evaluation metric
-
-    # Run the main training function
-    logger.info(f"Starting training with model: {model_name}, metric: {metric_name}")
-    main(model_name, metric_name)
+    main()
