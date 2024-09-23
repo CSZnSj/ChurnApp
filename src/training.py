@@ -10,6 +10,8 @@ from src.logger import setup_logger
 from src.utils import *
 from src.model_utils import *
 
+import argparse
+
 # Set up logger
 logger = setup_logger(__name__)
 
@@ -91,6 +93,12 @@ def main(
             logger.info("Stopping Spark session.")
             spark.stop()
             logger.info("Spark session stopped.")
-
+            
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description="Train a machine learning model.")
+    parser.add_argument('--model_name', type=str, required=True, help="The name of the model to train (e.g., 'gbt', 'rf').")
+    parser.add_argument('--metric_name', type=str, required=True, help="The evaluation metric (e.g., 'f1', 'accuracy').")
+
+    args = parser.parse_args()
+
+    main(model_name=args.model_name, metric_name=args.metric_name)

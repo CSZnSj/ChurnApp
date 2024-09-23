@@ -5,7 +5,7 @@ sys.path.append('/home/sajjad/Projects/ChurnApp')
 
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import log1p, when, col
-from pyspark.ml.feature import MinMaxScaler, StandardScaler, OneHotEncoder, StringIndexer, VectorAssembler
+from pyspark.ml.feature import MinMaxScaler, StandardScaler, OneHotEncoder, StringIndexer, VectorAssembler, RobustScaler
 from pyspark.ml import Pipeline
 from src.logger import setup_logger
 from src.utils import load_config, get_config_value, create_spark_session, read_parquet, write_parquet
@@ -134,15 +134,21 @@ def preprocess(df_train: DataFrame, df_eval: DataFrame, df_test: DataFrame) -> t
         "CountRecharge",
         "MedianRechargeAmount",
     ]
+    cdr_cols = [
+        "SumSMSCount",
+        "SumVoiceCount",
+        "SumCallDuration",
+        "SumGPRSUsage"
+    ]
     age_col = "age"
     account_balance_col = "account_balance"
     registration_year_col = "registration_year"
     categorical_cols = ["contract_type_v", "gender_v", "ability_status"]
 
     # Apply log1p to numeric columns
-    df_train = apply_log1p(df_train, numeric_cols)
-    df_eval = apply_log1p(df_eval, numeric_cols)
-    df_test = apply_log1p(df_test, numeric_cols)
+    df_train = apply_log1p(df_train, numeric_cols + cdr_cols)
+    df_eval = apply_log1p(df_eval, numeric_cols + cdr_cols)
+    df_test = apply_log1p(df_test, numeric_cols + cdr_cols)
     logger.info("Applied log1p to numeric columns")
 
     # Apply MinMax scaling to numeric columns
@@ -156,6 +162,18 @@ def preprocess(df_train: DataFrame, df_eval: DataFrame, df_test: DataFrame) -> t
         output_col="scaled_numeric_features",
     )
     logger.info("Applied MinMax scaling to numeric columns")
+
+    # Apply Robust scaling to cdr columns
+    df_train, df_eval, df_test = apply_scaling(
+        df_train=df_train,
+        df_eval=df_eval,
+        df_test=df_test,
+        cols=cdr_cols,
+        scaler=RobustScaler(),
+        input_col="features_cdr",
+        output_col="scaled_cdr_features",
+    )
+    logger.info("Applied Robust scaling to cdr columns")
 
     # Process age column: Fill nulls, cap, apply log1p, and then Standard scaling
     df_train, df_eval, df_test = fill_numerical_with_median(df_train, df_eval, df_test, [age_col])
@@ -230,6 +248,7 @@ def process_and_select_features(df_train: DataFrame, df_eval: DataFrame, df_test
     # List of final selected features
     selected_features = [
         "scaled_numeric_features",
+        "scaled_cdr_features",
         "scaled_age",
         "scaled_account_balance",
         "scaled_registration_year",

@@ -4,19 +4,20 @@ import sys
 sys.path.append('/home/sajjad/Projects/ChurnApp')
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, year, current_date, datediff, median, count, lit
+from pyspark.sql.functions import col, year, current_date, datediff, median, count, lit, sum
 from pyspark.sql.utils import AnalysisException
 from typing import Tuple
 from src.logger import setup_logger
 from src.utils import load_config, get_config_value, create_spark_session, write_parquet, read_parquet, remove_data
-
+from pyspark.sql.types import IntegerType, DoubleType
+ 
 logger = setup_logger(__name__)
 
 def read_required_data(
     spark: SparkSession,
     config: dict, 
     month: str
-) -> Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]:
+) -> Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]:
     """
     Reads the necessary Parquet files into DataFrames for a given month.
 
@@ -26,7 +27,7 @@ def read_required_data(
         month (str): The month string to be used in the file paths.
 
     Returns:
-        Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]: 
+        Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]: 
         DataFrames for loan assignment, loan recovery, package, recharge, and user data.
 
     Raises:
@@ -38,10 +39,11 @@ def read_required_data(
         recovery_df = read_parquet(spark=spark, parquet_path=base["loan_recovery"].format(month=month))
         package_df = read_parquet(spark=spark, parquet_path=base["package"].format(month=month))
         recharge_df = read_parquet(spark=spark, parquet_path=base["recharge"].format(month=month))
+        cdr_df = read_parquet(spark=spark, parquet_path=base["cdr"].format(month=month))
         user_df = read_parquet(spark=spark, parquet_path=base["user"].format(month=month))
         
         logger.info("Successfully read all required data for month: %s", month)
-        return assign_df, recovery_df, package_df, recharge_df, user_df
+        return assign_df, recovery_df, package_df, recharge_df, cdr_df, user_df
     
     except Exception as e:
         logger.error("Error reading required data for month %s: %s", month, str(e))
@@ -153,6 +155,34 @@ def prepare_recharge_df(recharge_df: DataFrame) -> DataFrame:
         logger.error("Error processing recharge DataFrame: %s", str(e))
         raise
 
+def prepare_cdr_df(cdr_df: DataFrame) -> DataFrame:
+    """
+    Processes the CDR DataFrame to compute the aggregated sum of SMS, voice, call duration, GPRS usage, 
+    and voice session cost per 'bib_id'.
+
+    Args:
+        cdr_df (DataFrame): DataFrame containing CDR data.
+
+    Returns:
+        DataFrame: Processed DataFrame with the aggregated sums per 'bib_id'.
+
+    Raises:
+        AnalysisException: If an error occurs during aggregation.
+    """
+    try:
+        aggregated_cdr_df = cdr_df.groupBy("bib_id").agg(
+            sum("sms_count").alias("SumSMSCount"),
+            sum("voice_count").alias("SumVoiceCount"),
+            sum("call_duration").alias("SumCallDuration"),
+            sum("gprs_usage").alias("SumGPRSUsage"),
+        )
+        logger.info("Successfully processed CDR DataFrame")
+        return aggregated_cdr_df
+    
+    except AnalysisException as e:
+        logger.error("Error processing CDR DataFrame: %s", str(e))
+        raise
+
 def prepare_user_df(user_df: DataFrame) -> DataFrame:
     """
     Processes the user DataFrame by calculating the age, extracting registration year, and selecting relevant columns.
@@ -189,8 +219,9 @@ def prepare_data(
     recovery_df: DataFrame,
     package_df: DataFrame,
     recharge_df: DataFrame,
-    user_df: DataFrame
-) -> Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]:
+    cdr_df: DataFrame,
+    user_df: DataFrame,
+) -> Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]:
     """
     Prepares all data by applying respective transformation functions to each DataFrame.
 
@@ -199,16 +230,18 @@ def prepare_data(
         recovery_df (DataFrame): Recovery data.
         package_df (DataFrame): Package data.
         recharge_df (DataFrame): Recharge data.
+        cdr_df (DataFrame): CDR data.
         user_df (DataFrame): User data.
 
     Returns:
-        Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]: Processed DataFrames for assignment, recovery, package, recharge, and user data.
+        Tuple[DataFrame, DataFrame, DataFrame, DataFrame, DataFrame, DataFrame]: Processed DataFrames for assignment, recovery, package, recharge, cdr and user data.
     """
     return (
         prepare_assign_df(assign_df),
         prepare_recovery_df(recovery_df),
         prepare_package_df(package_df),
         prepare_recharge_df(recharge_df),
+        prepare_cdr_df(cdr_df),
         prepare_user_df(user_df)
     )
 
@@ -217,6 +250,7 @@ def merge_dataframes(
     recovery_df: DataFrame,
     package_df: DataFrame,
     recharge_df: DataFrame,
+    cdr_df: DataFrame,
     user_df: DataFrame,
     churn_label_df: DataFrame
 ) -> DataFrame:
@@ -228,6 +262,7 @@ def merge_dataframes(
         recovery_df (DataFrame): Processed recovery data.
         package_df (DataFrame): Processed package data.
         recharge_df (DataFrame): Processed recharge data.
+        cdr_df (DataFrame): Processed CDR data
         user_df (DataFrame): Processed user data.
         churn_label_df (DataFrame): Churn label data.
 
@@ -239,6 +274,7 @@ def merge_dataframes(
         .join(recovery_df, on="bib_id", how="left") \
         .join(package_df, on="bib_id", how="left") \
         .join(recharge_df, on="bib_id", how="left") \
+        .join(cdr_df, on="bib_id", how="left") \
         .fillna(0) \
         .join(user_df, on="bib_id", how="left") \
         
@@ -271,7 +307,7 @@ def generate_dataset(
     """
     try:
         # Step 1: Read required data
-        assign_df, recovery_df, package_df, recharge_df, user_df = read_required_data(spark, config, month)
+        assign_df, recovery_df, package_df, recharge_df, cdr_df, user_df = read_required_data(spark, config, month)
 
         # Step 2: Handle deploy case by creating temporary labels
         if churn_label_df is None:
@@ -280,12 +316,12 @@ def generate_dataset(
             churn_label_df = churn_label_df.withColumn("label", lit("deploy"))  # Set label to temporary value 'deploy'
 
         # Step 3: Prepare each dataset
-        assign_df, recovery_df, package_df, recharge_df, user_df = prepare_data(
-            assign_df, recovery_df, package_df, recharge_df, user_df
+        assign_df, recovery_df, package_df, recharge_df, cdr_df, user_df = prepare_data(
+            assign_df, recovery_df, package_df, recharge_df, cdr_df, user_df
         )
         
         # Step 4: Merge all DataFrames with churn labels
-        merged_df = merge_dataframes(assign_df, recovery_df, package_df, recharge_df, user_df, churn_label_df)
+        merged_df = merge_dataframes(assign_df, recovery_df, package_df, recharge_df, cdr_df, user_df, churn_label_df)
         
         logger.info("Dataset generated successfully for month: %s", month)
         return merged_df

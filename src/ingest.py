@@ -5,7 +5,7 @@ sys.path.append('/home/sajjad/Projects/ChurnApp')
 
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import (
-    StructType, StructField, StringType, LongType, DoubleType, DecimalType
+    StructType, StructField, StringType, LongType, DoubleType, DecimalType, IntegerType
 )
 from src.logger import setup_logger
 from src.utils import *
@@ -13,64 +13,64 @@ class CustomSchema:
     """Defines custom schemas for different datasets."""
     
     loan_assign = StructType([
-        StructField("bib_id", StringType(), True),
+        StructField("bib_id", StringType(), False),
         StructField("date_key", StringType(), True),  # To be converted to date
         StructField("fake_id", StringType(), True),
         StructField("nid_hash", StringType(), True),
         StructField("loan_id", StringType(), True),
-        StructField("loan_amount", LongType(), True),
+        StructField("loan_amount", DoubleType(), True),
         StructField("date_timestamp", StringType(), True)  # To be converted to timestamp
     ])
 
     loan_recovery = StructType([
-        StructField("bib_id", StringType(), True),
+        StructField("bib_id", StringType(), False),
         StructField("date_key", StringType(), True),  # To be converted to date
         StructField("fake_id", StringType(), True),
         StructField("nid_hash", StringType(), True),
         StructField("loan_id", StringType(), True),
-        StructField("loan_amount", LongType(), True),
-        StructField("hsdp_recovery", LongType(), True),
+        StructField("loan_amount", DoubleType(), True),
+        StructField("hsdp_recovery", DoubleType(), True),
         StructField("date_timestamp", StringType(), True)  # To be converted to timestamp
     ])
 
     package = StructType([
-        StructField("bib_id", StringType(), True),
+        StructField("bib_id", StringType(), False),
         StructField("date_key", StringType(), True),  # To be converted to date
         StructField("fake_id", StringType(), True),
         StructField("nid_hash", StringType(), True),
         StructField("offering_code", StringType(), True),
-        StructField("offer_amount", LongType(), True),
+        StructField("offer_amount", DoubleType(), True),
         StructField("offering_name", StringType(), True),
         StructField("activation_date", StringType(), True),  # To be converted to timestamp
         StructField("deactivation_date", StringType(), True)  # To be converted to timestamp
     ])
 
     recharge = StructType([
-        StructField("bib_id", StringType(), True),
+        StructField("bib_id", StringType(), False),
         StructField("date_key", StringType(), True),  # To be converted to date
         StructField("fake_id", StringType(), True),
         StructField("nid_hash", StringType(), True),
-        StructField("recharge_value_amt", LongType(), True),
+        StructField("recharge_value_amt", DoubleType(), True),
         StructField("recharge_dt", StringType(), True),  # To be converted to timestamp
         StructField("origin_host_nm", StringType(), True),
-        StructField("account_balance_before_amt", LongType(), True),
-        StructField("account_balance_after_amt", LongType(), True)
+        StructField("account_balance_before_amt", DoubleType(), True),
+        StructField("account_balance_after_amt", DoubleType(), True)
     ])
 
     cdr = StructType([
-        StructField("bib_id", StringType(), True),
+        StructField("bib_id", StringType(), False),
         StructField("date_key", StringType(), True),  # To be converted to date
         StructField("fake_id", StringType(), True),
         StructField("nid_hash", StringType(), True),
-        StructField("sms_count", LongType(), True),
-        StructField("voice_count", LongType(), True),
-        StructField("call_duration", LongType(), True),
-        StructField("gprs_usage", LongType(), True),
-        StructField("voice_session_cos", DecimalType(10, 6), True)
+        StructField("sms_count", IntegerType(), True),
+        StructField("voice_count", IntegerType(), True),
+        StructField("call_duration", DoubleType(), True),
+        StructField("gprs_usage", DoubleType(), True),
+        StructField("voice_session_cos", DoubleType(), True)
     ])
 
     user = StructType([
-        StructField("bib_id", StringType(), True),
+        StructField("bib_id", StringType(), False),
         StructField("fake_id", StringType(), True),
         StructField("nid_hash", StringType(), True),
         StructField("contract_type_v", StringType(), True),
@@ -119,7 +119,7 @@ def ingest_data(spark: SparkSession, config: dict) -> None:
                 write_parquet(df, parquet_path, mode="overwrite")
 
                 # Remove the read csv file to optimize storage
-                remove_data(data_path=csv_path)
+                # remove_data(data_path=csv_path)
 
                 logger.info(f"Successfully processed and saved data for key {key} for month {month}.")
 

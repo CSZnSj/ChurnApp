@@ -35,8 +35,8 @@ def get_classifier(
         ValueError: If the model name is not recognized.
     """
     classifiers = {
-        "random_forest": RandomForestClassifier(featuresCol=feature_col, labelCol=label_col),
-        "logistic_regression": LogisticRegression(featuresCol=feature_col, labelCol=label_col),
+        "rf": RandomForestClassifier(featuresCol=feature_col, labelCol=label_col),
+        "lr": LogisticRegression(featuresCol=feature_col, labelCol=label_col),
         "gbt": GBTClassifier(featuresCol=feature_col, labelCol=label_col)
     }
 
@@ -63,12 +63,12 @@ def get_param_grid(
         ValueError: If the model name is not supported.
     """
     param_grids = {
-        "random_forest": ParamGridBuilder() \
+        "rf": ParamGridBuilder() \
             .addGrid(RandomForestClassifier().numTrees, [10, 20, 50]) \
             .addGrid(RandomForestClassifier().maxDepth, [5, 10, 20]) \
             .build(),
 
-        "logistic_regression": ParamGridBuilder() \
+        "lr": ParamGridBuilder() \
             .addGrid(LogisticRegression().regParam, [0.01, 0.1, 0.5]) \
             .addGrid(LogisticRegression().elasticNetParam, [0.0, 0.5, 1.0]) \
             .build(),
@@ -225,8 +225,8 @@ def load_model(model_name: str, model_path: str) -> Model:
         logger.info(f"Loading model '{model_name}' from {model_path}")
         
         model_loaders = {
-            "random_forest": RandomForestClassificationModel.load,
-            "logistic_regression": LogisticRegressionModel.load,
+            "rf": RandomForestClassificationModel.load,
+            "lr": LogisticRegressionModel.load,
             "gbt": GBTClassificationModel.load
         }
         
