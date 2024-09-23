@@ -4,6 +4,7 @@
 ChurnApp is a comprehensive data engineering and machine learning pipeline designed to predict customer churn in the telecom sector. It leverages Apache Spark and Airflow to process data, build machine learning models, and deploy them for real-world usage. The project is structured to handle large datasets efficiently, with a focus on scalability, reproducibility, and automation.
 
 ## Project Structure
+
 ```bash
 ChurnApp/
 │
@@ -14,7 +15,7 @@ ChurnApp/
 │     │     
 │     ├── intermediate/              # Intermediate data during processing
 │     │     ├── label/               # Generated labels for the dataset
-│     │     ├── dataset/             # Intermediate datasets after merging and processing
+│     │     ├── dataset/             # Intermediate datasets after merging
 │     │
 │     ├── processed/                 # Final preprocessed data for model training/testing
 │
@@ -25,8 +26,8 @@ ChurnApp/
 ├── src/                             # Source code for the project
 │   ├── ingest.py                    # Script for data ingestion and conversion to Parquet
 │   ├── prepare_label.py             # Script for preparing labels
-│   ├── prepare_dataset.py           # Script for dataset preparation and merging pyspark DataFrames
-│   ├── preprocess.py                # Script for preprocessing merged pyspark DataFrame and ready it for training models.   
+│   ├── prepare_dataset.py           # Script for dataset preparation and merging PySpark DataFrames
+│   ├── preprocess.py                # Script for preprocessing merged PySpark DataFrame and preparing it for model training
 │   ├── training.py                  # Script for model training
 │   ├── evaluating.py                # Script for model evaluation
 │   ├── deploying.py                 # Script for model deployment
@@ -43,6 +44,7 @@ ChurnApp/
 │        ├── plot_tools.py           # Helper functions for visualization
 │
 ├── requirements.txt                 # List of project dependencies
+├── config.json                      # Defines the structure and paths for data ingestion, preprocessing, labeling, model storage, and predictions for the churn prediction project.
 └── README.md                        # Project overview and setup instructions
 ```
 
@@ -60,7 +62,7 @@ ChurnApp/
 
 1. Clone this repository:
     ```bash
-    git clone https://github.com/your-username/ChurnApp.git
+    git clone https://github.com/CSZnSj/ChurnApp.git
     cd ChurnApp
     ```
 
