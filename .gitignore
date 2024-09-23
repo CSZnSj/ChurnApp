@@ -93,3 +93,6 @@ data/
 
 # models
 result/
+
+# plots
+notebooks/output
